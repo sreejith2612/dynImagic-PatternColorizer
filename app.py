@@ -1,38 +1,50 @@
 import streamlit as st
 from PIL import Image
 import numpy as np
+import matplotlib.pyplot as plt
 
-def apply_color_filter(image, color):
-    # Apply a color filter to the image
+def major_colors(image, num_colors=5):
+    # Get the major colors from the image
     img_np = np.array(image)
-    
-    if color == 'Red':
-        img_np[:,:,1] = 0
-        img_np[:,:,2] = 0
-    elif color == 'Green':
-        img_np[:,:,0] = 0
-        img_np[:,:,2] = 0
-    elif color == 'Blue':
-        img_np[:,:,0] = 0
-        img_np[:,:,1] = 0
-    
-    return Image.fromarray(img_np)
+    img_np = img_np.reshape((-1, 3))
+
+    # Get the colors using k-means clustering
+    from sklearn.cluster import KMeans
+    kmeans = KMeans(n_clusters=num_colors)
+    kmeans.fit(img_np)
+
+    colors = kmeans.cluster_centers_.astype(int)
+    colors = [tuple(color) for color in colors]
+
+    return colors
 
 def main():
-    st.title('Generate patterns')
+    st.title('Image Color Pattern App')
     
-    uploaded_files = st.file_uploader("Upload your images", accept_multiple_files=True)
+    uploaded_pattern = st.file_uploader("Upload the pattern image", type=['jpg', 'png'])
+    uploaded_image = st.file_uploader("Upload the main image", type=['jpg', 'png'])
     
-    if uploaded_files:
+    if uploaded_pattern and uploaded_image:
+        pattern = Image.open(uploaded_pattern)
+        image = Image.open(uploaded_image)
+        
+        colors = major_colors(image)
         st.sidebar.title('Filters')
-        color = st.sidebar.selectbox('Select a color', ['Red', 'Green', 'Blue'])
+        selected_color = st.sidebar.selectbox('Select a color', colors, format_func=lambda x: f'Color: {x}', index=0)
+        
+        # Display the thumbnails of colors
+        st.sidebar.markdown('**Color Thumbnails**')
+        for color in colors:
+            color_img = np.full((100, 100, 3), color, dtype=np.uint8)
+            st.sidebar.image(Image.fromarray(color_img), caption=f'Color: {color}', width=100)
+        
         generate_button = st.sidebar.button('Generate')
         
         if generate_button:
-            for uploaded_file in uploaded_files:
-                image = Image.open(uploaded_file)
-                filtered_image = apply_color_filter(image, color)
-                st.image(filtered_image, caption=f'{color} Filtered Image', use_column_width=True)
+            st.image(pattern, caption='Pattern Image', use_column_width=True)
+            st.image(image, caption='Main Image', use_column_width=True)
+            
+            st.write(f'Selected Color: {selected_color}')
 
 if __name__ == "__main__":
     main()
